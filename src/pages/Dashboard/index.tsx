@@ -1,56 +1,86 @@
-import React from 'react';
-import { Title, Form, Repositories } from './styles';
+import React, { useState, FormEvent, useEffect } from 'react';
+import { Title, Form, Repositories, InputError } from './styles';
 import Logo from '../../assets/logo.svg';
 import { FiChevronRight } from 'react-icons/fi';
+import api from '../../services/api';
+import { Link } from 'react-router-dom';
 
-const Dashboard: React.FC = () => (
-  <>
-    <img src={Logo} alt="GitHub Explorer" />
-    <Title>Explore repositórios no GitHub</Title>
+interface Repository {
+  full_name: string;
+  description: string;
+  owner: {
+    login: string;
+    avatar_url: string;
+  };
+}
 
-    <Form>
-      <input placeholder="Digite o nome do repositório" />
-      <button type="submit">Pesquisar</button>
-    </Form>
+const STORAGE_KEY = '@GitHubExplorer:repositories';
 
-    <Repositories>
-      <a href="http://">
-        <img
-          src="https://avatars2.githubusercontent.com/u/15945802?s=460&u=8cd3efd06fa80ec142f87a0c8f76cd7b14c254a0&v=4 "
-          alt="Mendown"
+const Dashboard: React.FC = () => {
+  const [repositories, setRepositories] = useState<Repository[]>(() => {
+    const storedRepositories = localStorage.getItem(STORAGE_KEY);
+    if (storedRepositories) {
+      return JSON.parse(storedRepositories);
+    }
+    return [];
+  });
+  const [newRepoName, setNewRepoName] = useState('');
+  const [inputError, setInputError] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(repositories));
+  }, [repositories]);
+
+  const handleAddNewRepository = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!newRepoName) {
+      return setInputError(
+        'Digite autor/nome_do_repositório. Ex: facebook/react'
+      );
+    }
+
+    try {
+      const response = await api.get<Repository>(`repos/${newRepoName}`);
+      setRepositories([...repositories, response.data]);
+      setNewRepoName('');
+      setInputError('');
+    } catch {
+      setInputError('Repositório não encontrado 😥');
+    }
+  };
+
+  return (
+    <>
+      <img src={Logo} alt="GitHub Explorer" />
+      <Title>Explore repositórios no GitHub</Title>
+
+      <Form hasError={!!inputError} onSubmit={handleAddNewRepository}>
+        <input
+          placeholder="Digite o nome do repositório"
+          value={newRepoName}
+          onChange={(e) => setNewRepoName(e.target.value)}
         />
-        <div>
-          <strong>altos_repos/marmassa</strong>
-          <p>Um repozinho bem sincero</p>
-        </div>
-        <FiChevronRight size={20} />
-      </a>
+        <button type="submit">Pesquisar</button>
+      </Form>
+      {inputError && <InputError>{inputError}</InputError>}
 
-      <a href="http://">
-        <img
-          src="https://avatars2.githubusercontent.com/u/15945802?s=460&u=8cd3efd06fa80ec142f87a0c8f76cd7b14c254a0&v=4 "
-          alt="Mendown"
-        />
-        <div>
-          <strong>altos_repos/marmassa</strong>
-          <p>Um repozinho bem sincero</p>
-        </div>
-        <FiChevronRight size={20} />
-      </a>
-
-      <a href="http://">
-        <img
-          src="https://avatars2.githubusercontent.com/u/15945802?s=460&u=8cd3efd06fa80ec142f87a0c8f76cd7b14c254a0&v=4 "
-          alt="Mendown"
-        />
-        <div>
-          <strong>altos_repos/marmassa</strong>
-          <p>Um repozinho bem sincero</p>
-        </div>
-        <FiChevronRight size={20} />
-      </a>
-    </Repositories>
-  </>
-);
+      <Repositories>
+        {repositories.map((repository) => (
+          <Link key={repository.full_name} to={`/repository/${repository.full_name}`}>
+            <img
+              src={repository.owner.avatar_url}
+              alt={repository.owner.login}
+            />
+            <div>
+              <strong>{repository.full_name}</strong>
+              <p>{repository.description + repository.description}</p>
+            </div>
+            <FiChevronRight size={20} />
+          </Link>
+        ))}
+      </Repositories>
+    </>
+  );
+};
 
 export default Dashboard;
